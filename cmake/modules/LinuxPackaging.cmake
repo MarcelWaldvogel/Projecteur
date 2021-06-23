@@ -17,7 +17,7 @@ list(APPEND _LinuxPackaging_MAP_dist_pkgtype
 )
 set(_LinuxPackaging_default_pkgtype "TGZ")
 
-# Funtion that adds 'dist-package' target
+# Function that adds 'dist-package' target
 # Arguments:
 #  PROJECT            : Project name to package
 #  TARGET             : Main executable target with version information
@@ -28,13 +28,13 @@ set(_LinuxPackaging_default_pkgtype "TGZ")
 #  DEBIAN_SECTION.....: A valid debian package section (default=devel)
 
 function(add_dist_package_target)
-  set(oneValueArgs 
+  set(oneValueArgs
     PROJECT # project name to package
     TARGET  # main executable build target that has version information attached to it
-    DESCRIPTION_BRIEF 
+    DESCRIPTION_BRIEF
     DESCRIPTION_FULL
     CONTACT # Maintainer / contact person
-    HOMEPAGE 
+    HOMEPAGE
     DEBIAN_SECTION
     PREINST_SCRIPT
     POSTINST_SCRIPT
@@ -54,7 +54,8 @@ function(add_dist_package_target)
     message(FATAL_ERROR "Argument 'TARGET' needs to be a valid target.")
   endif()
 
-  get_target_property(PKG_VERSION_STRING_FULL ${PKG_TARGET} VERSION_STRING)
+  get_target_property(PKG_VERSION_STRING_FULL ${PKG_TARGET} VERSION_STRING_FULL)
+  get_target_property(PKG_VERSION_STRING ${PKG_TARGET} VERSION_STRING)
   get_target_property(PKG_VERSION_MAJOR ${PKG_TARGET} VERSION_MAJOR)
   get_target_property(PKG_VERSION_MINOR ${PKG_TARGET} VERSION_MINOR)
   get_target_property(PKG_VERSION_PATCH ${PKG_TARGET} VERSION_PATCH)
@@ -70,9 +71,12 @@ function(add_dist_package_target)
   if("${PKG_VERSION_PATCH}" STREQUAL "")
     set(PKG_VERSION_PATCH 0)
   endif()
-  set(PKG_VERSION_STRING "${PKG_VERSION_MAJOR}.${PKG_VERSION_MINOR}.${PKG_VERSION_PATCH}")
-  set(PKG_VERSION_IDENTIFIERS "${PKG_VERSION_FLAG}.${PKG_VERSION_DISTANCE}")
-
+  set(PKG_VERSION_STRING_BASE "${PKG_VERSION_MAJOR}.${PKG_VERSION_MINOR}.${PKG_VERSION_PATCH}")
+  if("${PKG_VERSION_FLAG}" STREQUAL "")
+    set(PKG_VERSION_IDENTIFIERS "1")
+  else()
+    set(PKG_VERSION_IDENTIFIERS "0${PKG_VERSION_FLAG}.${PKG_VERSION_DISTANCE}")
+  endif()
   # Set defaults if not set
   if("${PKG_CONTACT}" STREQUAL "")
     set(PKG_CONTACT "Generic Maintainer <generic@main.tainer>")
@@ -130,7 +134,7 @@ function(add_dist_package_target)
       endif()
     endforeach()
   endif()
-  
+
   if(INCLUDED_PROJECT_DEPENDENCIES AND PkgDependenciesMake_MAP_${PKG_PROJECT})
     set(PKG_BUILD_DEPENDENCY_FOUND 0)
     # Find dependencies for Linux distribution (and version)
@@ -168,10 +172,14 @@ function(add_dist_package_target)
   endif()
 
   configure_file(
-    "${_LinuxPackaging_DIRECTORY}/travis-ci-bintray-deploy.json.in" 
+    "${_LinuxPackaging_DIRECTORY}/travis-ci-bintray-deploy.json.in"
     "${CMAKE_CURRENT_BINARY_DIR}/travis-ci-bintray-deploy.json" @ONLY)
 
   message(STATUS "Configured target 'dist-package' with Linux '${PKG_DIST}' and package type '${PKG_TYPE}'")
+
+  # Make some information available to parent scope
+  set(PKG_DIST "${PKG_DIST}" PARENT_SCOPE)
+  set(PKG_TYPE "${PKG_TYPE}" PARENT_SCOPE)
 endfunction()
 
 # makepg packaging (arch linux/pacman)
@@ -186,7 +194,7 @@ function(_makepkg_packaging)
   set(PKG_PKGBUILD_INSTALL_FILE_PATH "${PKG_SOURCE_ARCHIVE_DIR}/${PKG_PKGBUILD_INSTALL_FILE}")
   file(MAKE_DIRECTORY "${PKG_SOURCE_ARCHIVE_DIR}")
   file(WRITE "${PKG_PKGBUILD_INSTALL_FILE_PATH}" "# generated install file\n\n")
-  
+
   if(PKG_PREINST_SCRIPT)
     file(READ "${PKG_PREINST_SCRIPT}" _pkg_preinst_script_content)
     file(APPEND "${PKG_PKGBUILD_INSTALL_FILE_PATH}"
@@ -237,7 +245,7 @@ function(_makepkg_packaging)
 
   # makepkg: '-' is not allowed in version number
   string(REPLACE "-" "" PKG_PKGBUILD_VER "${PKG_VERSION_STRING_FULL}")
-  
+
   set(PKG_CONFIG_TEMPLATE "${_LinuxPackaging_DIRECTORY}/PKGBUILD.in")
   set(PKG_CONFIG_FILE "${PKG_SOURCE_ARCHIVE_DIR}/PKGBUILD")
   configure_file("${PKG_CONFIG_TEMPLATE}" "${PKG_CONFIG_FILE}" @ONLY)
@@ -268,7 +276,7 @@ endfunction()
 
 # Default cpack packaging (DEB, RPM, TGZ)
 function(_cpack_default_packaging)
-  set(PKG_CPACK_PKG_FILENAME "${PKG_NAME}-${PKG_VERSION_STRING_FULL}_${PKG_DIST}-${CMAKE_SYSTEM_PROCESSOR}")
+  set(PKG_CPACK_PKG_FILENAME "${PKG_NAME}-${PKG_VERSION_STRING}_${PKG_DIST}-${CMAKE_SYSTEM_PROCESSOR}")
   set(PKG_CPACK_PKG_FILE_PREFIX "dist-pkg")
   set(PKG_CONFIG_TEMPLATE "${_LinuxPackaging_DIRECTORY}/LinuxPkgCPackConfig.cmake.in")
   set(PKG_CONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/CPackConfig-${PKG_TYPE}.cmake")
